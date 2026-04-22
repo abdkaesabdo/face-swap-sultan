@@ -1,42 +1,51 @@
-# 1. القاعدة الحديثة
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+# 1. استخدام صورة بايثون الرسمية المبنية على Debian Bookworm
+# هذه الصورة مستقرة جداً ولا تعاني من مشاكل مستودعات نيفيديا/أوبونتو (الخطأ 100)
+FROM python:3.12-slim-bookworm
 
+# منع التوقف للأسئلة التفاعلية
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
 
-# 2. التخلص من "زبالة" المستودعات المكسورة وتثبيت بايثون 3.12
-RUN rm -f /etc/apt/sources.list.d/cuda.list /etc/apt/sources.list.d/nvidia-ml.list && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends software-properties-common curl git wget ffmpeg libsm6 libxext6 libgl1-mesa-glx && \
-    add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends python3.12 python3.12-dev python3.12-distutils && \
-    rm -rf /var/lib/apt/lists/*
+# 2. تثبيت المكتبات النظامية (بأمر واحد نظيف ومباشر)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libgl1-mesa-glx \
+    git \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# 3. تثبيت pip بشكل مباشر واحترافي لنسخة 3.12
-RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
+# 3. تحديث Pip وأدوات البناء
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# 4. تثبيت المكتبات (مقسمة لضمان استقرار البناء ورفع الجودة)
-RUN python3.12 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+# 4. تثبيت مكتبات الذكاء الاصطناعي (دعم CUDA 12.1)
+# سنقوم بجلب المكتبات من مستودع PyTorch الرسمي مباشرة لضمان السرعة
+RUN pip install --no-cache-dir \
+    torch==2.3.0 \
+    torchvision==0.18.0 \
+    --index-url https://download.pytorch.org/whl/cu121
 
-# تحميل Torch (أكبر جزء في الحاوية)
-RUN python3.12 -m pip install --no-cache-dir \
-    torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
-
-# تحميل مكتبات Face Swap (الذكاء الاصطناعي الكامل)
-RUN python3.12 -m pip install --no-cache-dir \
+# تثبيت بقية مستلزمات Face Swap
+RUN pip install --no-cache-dir \
     numpy==1.26.4 \
     onnx==1.16.0 \
     onnxruntime-gpu==1.17.1 \
     insightface==0.7.3 \
     opencv-python-headless \
-    gfpgan basicsr facexlib tqdm pillow
+    gfpgan \
+    basicsr \
+    facexlib \
+    tqdm \
+    pillow
 
-# 5. إعداد البيئة والملفات
+# 5. إعداد مجلد العمل والهيكل
 WORKDIR /app
 RUN mkdir -p models/_cache models/swap models/insightface/models/buffalo_l
+
+# 6. نسخ الملفات
 COPY . .
 
-# توحيد الروابط
-RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 && ln -sf /usr/bin/python3.12 /usr/bin/python
-
-CMD ["python3", "main.py"]
+# 7. التشغيل
+CMD ["python", "main.py"]
