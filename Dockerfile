@@ -1,39 +1,34 @@
-# 1. القاعدة: Ubuntu مع CUDA 12.1 لدعم كرت الشاشة
+# القاعدة الحديثة التي طلبتها
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
-# منع التوقف لطلب مدخلات أثناء التثبيت
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 2. تثبيت المتطلبات وبايثون 3.12 مع الأدوات اللازمة للبناء
-RUN apt-get update && apt-get install -y \
+# حل مشكلة الخطأ 100: تحديث المفاتيح والمستودعات بشكل آمن
+RUN apt-get update || true && \
+    apt-get install -y --no-install-recommends gnupg2 curl ca-certificates && \
+    apt-get update && apt-get install -y \
     software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
+    add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y \
     python3.12 \
     python3.12-dev \
     python3.12-distutils \
-    python3.12-venv \
     ffmpeg \
     libsm6 \
     libxext6 \
     libgl1-mesa-glx \
+    git \
     wget \
-    unzip \
-    git && \
-    rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# 3. ربط نسخ بايثون وتثبيت pip يدوياً (لحل مشكلة 3.12)
+# ربط النسخ وتثبيت pip لنسخة 3.12
 RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
     ln -sf /usr/bin/python3.12 /usr/bin/python && \
-    wget https://bootstrap.pypa.io/get-pip.py && \
-    python3 get-pip.py && \
-    rm get-pip.py
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
 
-# 4. تحديث أدوات التثبيت الأساسية
-RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
-
-# 5. تثبيت مكتبات الذكاء الاصطناعي (متوافقة مع CUDA 12.1)
-RUN python3 -m pip install --no-cache-dir \
+# تثبيت كامل المكتبات التي طلبتها وبالنسخ الحديثة
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    python3 -m pip install --no-cache-dir \
     numpy==1.26.4 \
     onnx==1.16.0 \
     onnxruntime-gpu==1.17.1 \
@@ -47,12 +42,9 @@ RUN python3 -m pip install --no-cache-dir \
     torch==2.3.0 --index-url https://download.pytorch.org/whl/cu121 \
     torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
 
-# 6. إعداد هيكل المجلدات داخل الحاوية
 WORKDIR /app
 RUN mkdir -p models/_cache models/swap models/insightface/models/buffalo_l
 
-# 7. نسخ ملفات مشروعك بالكامل إلى الحاوية
 COPY . .
 
-# 8. أمر التشغيل الافتراضي (تأكد أن ملفك الأساسي اسمه main.py)
 CMD ["python3", "main.py"]
