@@ -1,50 +1,42 @@
-# القاعدة الحديثة التي طلبتها
+# 1. القاعدة الحديثة
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# حل مشكلة الخطأ 100: تحديث المفاتيح والمستودعات بشكل آمن
-RUN apt-get update || true && \
-    apt-get install -y --no-install-recommends gnupg2 curl ca-certificates && \
-    apt-get update && apt-get install -y \
-    software-properties-common && \
+# 2. التخلص من "زبالة" المستودعات المكسورة وتثبيت بايثون 3.12
+RUN rm -f /etc/apt/sources.list.d/cuda.list /etc/apt/sources.list.d/nvidia-ml.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends software-properties-common curl git wget ffmpeg libsm6 libxext6 libgl1-mesa-glx && \
     add-apt-repository ppa:deadsnakes/ppa -y && \
-    apt-get update && apt-get install -y \
-    python3.12 \
-    python3.12-dev \
-    python3.12-distutils \
-    ffmpeg \
-    libsm6 \
-    libxext6 \
-    libgl1-mesa-glx \
-    git \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get update && \
+    apt-get install -y --no-install-recommends python3.12 python3.12-dev python3.12-distutils && \
+    rm -rf /var/lib/apt/lists/*
 
-# ربط النسخ وتثبيت pip لنسخة 3.12
-RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 && \
-    ln -sf /usr/bin/python3.12 /usr/bin/python && \
-    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
+# 3. تثبيت pip بشكل مباشر واحترافي لنسخة 3.12
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
 
-# تثبيت كامل المكتبات التي طلبتها وبالنسخ الحديثة
-RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    python3 -m pip install --no-cache-dir \
+# 4. تثبيت المكتبات (مقسمة لضمان استقرار البناء ورفع الجودة)
+RUN python3.12 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# تحميل Torch (أكبر جزء في الحاوية)
+RUN python3.12 -m pip install --no-cache-dir \
+    torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
+
+# تحميل مكتبات Face Swap (الذكاء الاصطناعي الكامل)
+RUN python3.12 -m pip install --no-cache-dir \
     numpy==1.26.4 \
     onnx==1.16.0 \
     onnxruntime-gpu==1.17.1 \
     insightface==0.7.3 \
-    opencv-python-headless==4.10.0.84 \
-    pillow==10.3.0 \
-    tqdm==4.66.4 \
-    basicsr==1.4.2 \
-    facexlib==0.3.0 \
-    gfpgan==1.3.8 \
-    torch==2.3.0 --index-url https://download.pytorch.org/whl/cu121 \
-    torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu121
+    opencv-python-headless \
+    gfpgan basicsr facexlib tqdm pillow
 
+# 5. إعداد البيئة والملفات
 WORKDIR /app
 RUN mkdir -p models/_cache models/swap models/insightface/models/buffalo_l
-
 COPY . .
+
+# توحيد الروابط
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 && ln -sf /usr/bin/python3.12 /usr/bin/python
 
 CMD ["python3", "main.py"]
