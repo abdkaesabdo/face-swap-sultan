@@ -1,4 +1,4 @@
-name: Build Sultan FaceSwap
+name: Build Sultan Hybrid FaceSwap
 
 on:
   push:
@@ -23,4 +23,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: shababd11/face-swap-sultan:latest
+          tags: |
+            shababd11/face-swap-sultan:latest
+            shababd11/face-swap-sultan:hybrid
